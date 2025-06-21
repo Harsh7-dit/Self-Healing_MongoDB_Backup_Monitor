@@ -4,7 +4,7 @@ metadata:
   name: mongobackup-alert-rules
   namespace: monitoring
   labels:
-    release: prometheus # This label is important for the Helm chart to pick it up
+    release: prometheus
 spec:
   groups:
   - name: MongoDBBackup.rules
