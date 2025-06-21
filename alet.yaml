@@ -1,0 +1,49 @@
+global:
+  resolve_timeout: 5m
+inhibit_rules:
+- equal:
+  - namespace
+  - alertname
+  source_matchers:
+  - severity = critical
+  target_matchers:
+  - severity =~ warning|info
+- equal:
+  - namespace
+  - alertname
+  source_matchers:
+  - severity = warning
+  target_matchers:
+  - severity = info
+- equal:
+  - namespace
+  source_matchers:
+  - alertname = InfoInhibitor
+  target_matchers:
+  - severity = info
+- target_matchers:
+  - alertname = InfoInhibitor
+receivers:
+- name: "null"
+- name: 'backup-self-healing-webhook'
+  webhook_configs:
+  - url: 'http://backup-webhook-service.default.svc.cluster.local:80/webhook'
+    # This is the internal Kubernetes DNS address for your service.
+    # Format: http://<service-name>.<namespace>.svc.cluster.local:<port>/<path>
+    send_resolved: false
+route:
+  group_by: ['job']
+  # This is the default receiver if no other routes match.
+  # It's good practice to send unmatched alerts somewhere, e.g., your 'null' receiver.
+  receiver: 'null'
+  routes:
+    # ADD THIS NEW ROUTE AT THE TOP
+    - receiver: 'backup-self-healing-webhook'
+      matchers:
+        - alertname = MongoNightlyBackupFailed
+    # existing routes from the Helm chart will be below...
+    - receiver: 'null'
+      match:
+        alertname: Watchdog
+templates:
+- /etc/alertmanager/config/*.tmpl

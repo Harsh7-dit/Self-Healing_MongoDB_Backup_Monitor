@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mongobackup-alert-rules
+  namespace: monitoring
+  labels:
+    release: prometheus # This label is important for the Helm chart to pick it up
+spec:
+  groups:
+  - name: MongoDBBackup.rules
+    rules:
+    - alert: MongoNightlyBackupFailed
+      expr: kube_job_status_failed{job_name=~"mongo-nightly-backup.*"} == 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "MongoDB nightly backup failed"
+        description: "The Kubernetes Job {{ $labels.job_name }} for the nightly MongoDB backup has failed."

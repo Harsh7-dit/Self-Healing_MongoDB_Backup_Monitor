@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-nightly-backup
+spec:
+  schedule: "49 05 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: mongodump-container
+            image: mongo:5.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Install dependencies: AWS CLI. The 'apt-get' commands work on the Debian-based mongo image.
+              echo "Installing dependencies..."
+              apt-get update && apt-get install -y awscli
+
+              # Define backup and S3 variables
+              DUMP_NAME="mongodump-$(date +'%Y-%m-%dT%H-%M-%S').gz"
+              S3_BUCKET="s3://mongodb-data-ups/ups" # <-- IMPORTANT: Change this
+              BACKUP_FILE="/tmp/${DUMP_NAME}"
+
+              echo "Starting mongodump to ${BACKUP_FILE}..."
+              mongodump --uri="$MONGO_URI" --archive="${BACKUP_FILE}" --gzip
+              if [ $? -eq 0 ]; then
+                echo "Backup completed successfully: $(basename $BACKUP_FILE)";
+              else
+                echo "Backup failed";
+              fi
+              echo "Uploading backup to ${S3_BUCKET}..."
+              aws s3 cp "${BACKUP_FILE}" "${S3_BUCKET}/${DUMP_NAME}"
+              if [ $? -eq 0 ]; then
+                echo "Backup Upload on S3 Successful";
+              else
+                echo "Upload on S3 failed";
+              fi
+            env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo-uri
+            # ... resources section ...
+          restartPolicy: OnFailure
